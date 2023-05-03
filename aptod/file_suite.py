@@ -141,21 +141,21 @@ class FileSuite:
         path = f'{os.path.expanduser("~")}/.local/share/applications/'
         if not os.path.exists(path):
             os.makedirs(path)
-        app_name = re.findall('\w+', app_data['name'])[0].lower()
-        desktop_path = path + re.findall('\w+', app_data['name'])[0] + '.desktop'
 
+        app_name = re.findall('\w+', app_data['name'])[0].lower()
+        desktop_path = path + app_name + '.desktop'
         app_icon_path = os.path.join(app_data['app_down_path'], "icon.png")
 
         if not os.path.exists(app_icon_path):                        
             with open(app_icon_path, 'wb') as file:            
                 example_dot = file.write(logo_generator(re.findall('\w+', app_data['name'])[0]))
-        
+
         # If .desktop is exist only change version
-        if not os.path.exists(desktop_path):            
+        if not os.path.exists(desktop_path):                   
             with open(f'{os.path.dirname(__file__)}/data/example.desktop', 'r') as file:            
                 example_dot = file.read()
             
-            example_dot = example_dot.replace('{app_path}', app_data['app_down_path'] + '/' + app_data['name'])
+            example_dot = example_dot.replace('{app_path}', os.path.join(app_data['app_down_path'], app_data['name']))
             example_dot = example_dot.replace('{app_name}', re.findall('\w+', app_data['name'])[0])
             example_dot = example_dot.replace('{app_icon_path}', app_icon_path)
 
