@@ -14,6 +14,13 @@ __version__ = "0.0.1"
 
 APP_LIST =  ExtractSuite().get('all')
 
+def app_data_error_handler(func):    
+    def wrapper():
+        if app_data.get('Error'):
+            print(app_data['Error'])
+        else:
+            func()    
+    return wrapper
 
 def download_menu():
     terminal_menu = TerminalMenu(
@@ -87,7 +94,6 @@ class Aptod:
         # And create dictionary with three data, file_name, name, file_path
         installed_apps = {}
 
-        
         for file_name, file_path in installed_appimages.items(): 
             
             for app in self.apps:                  
@@ -100,7 +106,6 @@ class Aptod:
         return installed_apps
 
     def update_apps(self, **kwargs):
-
         installed = self.installed_apps()
         app_list = installed
         if not app_list:
@@ -113,7 +118,9 @@ class Aptod:
             app_name = installed[app]['file_name']
             app_data = self.up.has_update(app_path)
             # If functions returns data, there is a update
-            if app_data:
+            if app_data.get('Error'):
+                print(app_data['Error'])
+            elif app_data:
                 print(f'❌ {app} is old to date.')
                 if kwargs.get('operation') == 'update':                
                     app_data['app_down_path'] = app_path.replace(app_name, '')
@@ -127,10 +134,12 @@ class Aptod:
         if 'all' in app_list:
             app_list = ExtractSuite().get('all')
         for app in app_list:
-            app_data = ExtractSuite().get(app)     
-            if app_data:
+            app_data = ExtractSuite().get(app)  
+            if isinstance(app_data, dict) and app_data.get('Error'):
+                print(app_data['Error']) 
+            elif app_data:
                 # Create folder with app name
-                # Make first letter capital                        
+                # Make first letter capital
                 app = ''.join(re.findall('\w+', app_data['name'])[:2])
                 down_path = self.main_folder + '/' + app
                 if not os.path.exists(down_path):
@@ -174,6 +183,12 @@ class Aptod:
                 has_update['app_down_path'] = down_path
                 has_update['app_cur_path'] = file_
                 UpSuite().update_app(app_data=has_update)   
+
+def app_data_error_handler(app_data: dict, func) -> None:
+    if app_data.get('Error'):
+        print(app_data['Error'])
+    else:
+        func(app_data)
 
 # Entry point to cli             
 def main():
@@ -260,7 +275,9 @@ def main():
 
         if args.add_repo:
             if len(args.add_repo) > 0:
-                Aptod().fs.update_repo(args.add_repo)         
+                app_data = ExtractSuite().get(args.add_repo)
+                app_data_error_handler(app_data, Aptod().fs.update_repo)
+                         
              
 
         # Install --install, -i
@@ -283,25 +300,26 @@ def main():
                     for app in args.download:
                         app_data = ExtractSuite().get(app)
                         app_data['app_down_path'] = args.path
-                        DownSuite().download(app_data=app_data)
+                        app_data_error_handler(app_data, DownSuite().download)
+                        # downloader_error_wrapper(app_data)
+                        
                 else:
                     for app in download_menu():
                         app_data = ExtractSuite().get(app)
                         app_data['app_down_path'] = args.path
-                        DownSuite().download(app_data=app_data)
+                        app_data_error_handler(app_data, DownSuite().download)
             else:
                 if len(args.download) > 0:
                     for app in args.download:
                         app_data = ExtractSuite().get(app)     
-                        print(app_data)
-                        return    
                         app_data['app_down_path'] = os.getcwd()
-                        DownSuite().download(app_data=app_data)
+                        app_data_error_handler(app_data, DownSuite().download)
                 else:
                     for app in download_menu():
                         app_data = ExtractSuite().get(app)
                         app_data['app_down_path'] = os.getcwd()
-                        DownSuite().download(app_data=app_data)
+                        app_data_error_handler(app_data, DownSuite().download)
+ 
         
         # --update, -u
         elif type(args.update) == list:

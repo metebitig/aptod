@@ -5,7 +5,7 @@ from string import ascii_letters
 from io import BytesIO
 
  
-def logo_generator(text):
+def logo_generator(text) -> bytes:
     """Creates logo for given text and
     returns logo as bytes."""
 

@@ -24,8 +24,8 @@ class UpSuite:
 
         if app_name:
             app_data = self.extractor.get(app_name)
-            if not app_data:
-                return {}
+            if app_data.get('Error'):
+                return app_data
 
         down_url = app_data.get('down_url')
         down_name = app_data.get('name')

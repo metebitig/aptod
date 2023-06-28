@@ -4,7 +4,6 @@ import json
 import  re
 
 from .logo_maker import logo_generator
-from . import extract_suite
 
 
 """
@@ -13,8 +12,7 @@ It will create or delete config, dir... and that kind a things.
 """
 
 
-class FileSuite:
-    
+class FileSuite:    
     def __init__(self):
         self.cfg_dir = os.path.expanduser('~') + "/.config/aptod" 
         self.cfg_pth = self.cfg_dir + '/aptod.conf'
@@ -48,11 +46,12 @@ class FileSuite:
         with open(self.repo_pth, 'w') as file:
             json.dump({}, file, indent = 2) 
 
-    def update_repo(self, url: str):
+    def update_repo(self, app_data: dict):
         """Adds new url to local repo file."""
+        url = app_data['down_url']
         
-        def app_name_generator(url):
-            app_data = extract_suite.ExtractSuite().get(url)
+        def app_name_generator(url):          
+
             list_of_url = url.split('.com/', 1)[1]
             repo_name = list_of_url.split('/')[1]
             
@@ -80,6 +79,8 @@ class FileSuite:
         data[app_name] = url
         with open(self.repo_pth, 'w') as file:
             json.dump(data, file, indent = 2) 
+
+        return data
 
     def get_repo(self):
         if not os.path.exists(self.repo_pth):

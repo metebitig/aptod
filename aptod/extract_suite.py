@@ -3,7 +3,9 @@ import re
 import json
 import platform
 from cpuinfo import get_cpu_info
-
+from urllib.parse import urlparse, unquote
+from pathlib import PurePosixPath
+import time
 
 from .file_suite import FileSuite
 
@@ -71,37 +73,49 @@ class ExtractSuite:
 
             return name
 
-    def github_extractor(self, owner="", repo="", **kwargs) -> dict:
+    def github_extractor(self, owner=None, repo=None, **kwargs) -> dict:
         """Takes Github repo and it's owner as
         arugment. Returns latest appImage data.
         If couldn't find data returns empty dictionary."""
-        kwargs_url = kwargs.get('url')
-        
+
+        kwargs_url = kwargs.get('url')        
         if kwargs_url:
-            list_of_url = kwargs_url.split('.com/', 1)[1]
-            list_of_url = list_of_url.split('/')
-            owner = list_of_url[0]
-            repo = list_of_url[1]
+            owner = PurePosixPath(unquote(urlparse(kwargs_url).path)).parts[1]
+            repo = PurePosixPath(unquote(urlparse(kwargs_url).path)).parts[2]
 
         api_url = f'https://api.github.com/repos/{owner}/{repo}/releases'  
 
-        def get_releases(url: str, page=1, per_page=30) -> list:
+        def get_releases(url: str, page: int=1, per_page: int=30) -> list:
             headers = {
                 'X-GitHub-Api-Version': '2022-11-28',
                 "Accept": "application/vnd.github+json"
             }                
             params = {'per_page': per_page, 'page': page}
             r = requests.get(url, headers=headers, params=params, timeout=5)
-            r.raise_for_status()   
-            # print(r.headers['x-ratelimit-remaining'])
-            
+            r_json = r.json()
+
+           
+            # Let user know, if rate limit ended. 
+            if r.status_code == 403 and r.headers['X-RateLimit-Remaining'] == '0':  
+                remaining_time = time.strftime(
+                    "%M:%S", time.gmtime(
+                        int(r.headers['X-RateLimit-Reset']) - int(time.time())
+                    )
+                )
+                return [{
+                    'Error': f"Your hourly Github api rate limit (60) exceeded." 
+                    f"\nLimit will be reset after {remaining_time} minutes."
+                }]
+            elif r.status_code == 404:
+                return [{
+                    'Error': f"Not found {owner}/{repo}"
+                }]
             # If it's latest release then r.json() is only one item as dict
-            if isinstance(r.json(), dict):
-                return [r.json()]            
-            
-            return r.json()
+            if isinstance(r_json, dict):
+                return [r_json]  
+            return r_json
         
-        def app_data(r_list) -> dict:
+        def app_data(r_list: list) -> dict:
             """Returns latest release data from list.""" 
 
             # Remove prereleased items in r_list
@@ -109,17 +123,25 @@ class ExtractSuite:
 
             for rel in r_list:                       
                 for asset in rel.get('assets'):
-                    # If asset match with re, than that's what we need     
-                    # If there is i386 (32-bit) keep search for 64-bit
+                    # 1) Bellow, If asset matchs with regex, than thats a appimage   
+                    # 2) If AppImage inlcudes processor arc type than choose compatible one.
                     if re.search('.AppImage$', asset['name']) and self.compatible_with_my_proccessor(asset['name']):                        
                         return {                        
                             'down_url': asset['browser_download_url']
-                        }        
-                    
+                        }   
             return {}    
-        
-        # Try for latest, it will not work for most of repo's...        
-        data = app_data(get_releases(api_url + '/latest'))
+                
+        # Try for latest, it will not work for most of repos... 
+        releases = get_releases(api_url + '/latest') 
+
+        # If rate limit ends than it will work.
+        if releases and releases[0].get('Error'):
+            data = releases[0]
+            return data
+
+        data = app_data(releases)   
+
+        # If latest request gets empty, than make new one thats not only for latest
         if not data:
             page = 0
             per_page = 0
@@ -129,9 +151,10 @@ class ExtractSuite:
                 data = app_data(get_releases(api_url, page=page, per_page=per_page))
                 if data:
                     break  
-
+        
+        # After above requests, still no data. Than return error message.
         if not data:
-            return {'Error': f'No release has been found for {repo}.'}              
+            return {'Error': f'No release has been found for appImage at {repo}.'}              
         
         # Get name for data, from down_url
         data['name'] = self.nail_version(data['down_url'])    
@@ -183,7 +206,7 @@ class ExtractSuite:
         releases = get_releases(api_url)
         data = app_data(releases)
         # Get name for data, from down_url
-        data['name'] = self.nail_version(data['down_url'])         
+        data['name'] = self.nail_version(data['down_url'])      
         return  data  
     
     def is_valid_url(self, url):
@@ -250,8 +273,7 @@ class ExtractSuite:
                 return self.github_extractor(url=app)
             else:
                 #Gitlab
-                ...
-        # When requested app not exist return None        
+                ...          
         elif app in build_in_apps:
             return apps[app.lower()]()
         

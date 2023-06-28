@@ -9,7 +9,7 @@ class DownSuite:
         """Downloads file in given app data url
         to given app data path with progress bar.
         Detects broken downloads and completes them."""
-        
+
         path = os.path.join(app_data["app_down_path"], app_data['name'])
         path_part = path + '.part'
         app_name = app_data['name']
