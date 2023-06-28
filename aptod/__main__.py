@@ -3,4 +3,3 @@
 from .aptod import main
 
 main()
-

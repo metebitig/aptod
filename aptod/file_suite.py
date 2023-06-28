@@ -1,4 +1,10 @@
-import shutil 
+
+"""
+This class releated with file opertions.
+It will create or delete config, dir... and that kind a things.
+"""
+
+import shutil
 import os
 import json
 import  re
@@ -6,19 +12,16 @@ import  re
 from .logo_maker import logo_generator
 
 
-"""
-This class releated with file opertions.
-It will create or delete config, dir... and that kind a things.
-"""
+class FileSuite:
+    """Creates, updates, deletes neccesary files for Aptod."""
 
-
-class FileSuite:    
     def __init__(self):
-        self.cfg_dir = os.path.expanduser('~') + "/.config/aptod" 
+        self.cfg_dir = os.path.expanduser('~') + "/.config/aptod"
         self.cfg_pth = self.cfg_dir + '/aptod.conf'
         self.repo_pth = self.cfg_dir + '/aptod_repo.json'
 
-    def create_config(self):
+    def create_config(self) -> None:
+        """Creates config file for user."""
 
         if os.path.exists(self.cfg_pth):
             print(f'Config file aldready exist at "{self.cfg_pth}"')
@@ -28,88 +31,91 @@ class FileSuite:
         if not os.path.exists(self.cfg_dir):
             os.makedirs(self.cfg_dir)
 
-        # Finally create .conf         
+        # Finally create .conf
         cfg_data = {"MainFolder": f"{os.path.expanduser('~')}/appImage"}
 
         # Write first config
-        with open(self.cfg_pth, 'w') as file:
-            json.dump(cfg_data, file, indent = 2) 
+        with open(self.cfg_pth, 'w', encoding="utf-8") as file:
+            json.dump(cfg_data, file, indent = 2)
 
         if not os.path.exists(cfg_data['MainFolder']):
             os.makedirs(cfg_data['MainFolder'])
-        
-    def create_repo(self):
+
+    def create_repo(self) -> None:
+        """Creates repo file for Aptod, if thats already exist."""
         if os.path.exists(self.repo_pth):
-            print(f'Repo file aldready exist at "{self.repo_pth}"')
-            return   
+            return
 
-        with open(self.repo_pth, 'w') as file:
-            json.dump({}, file, indent = 2) 
+        with open(self.repo_pth, 'w', encoding="utf-8") as file:
+            json.dump({}, file, indent=2)
 
-    def update_repo(self, app_data: dict):
+    def update_repo(self, app_data: dict) -> dict:
         """Adds new url to local repo file."""
         url = app_data['down_url']
-        
-        def app_name_generator(url):          
+
+        def app_name_generator(url: str) -> str:
 
             list_of_url = url.split('.com/', 1)[1]
             repo_name = list_of_url.split('/')[1]
-            
+
             # Capitalize each capital letter, than remove spaces in name
-            app_name = ' '.join(re.findall('\w+', repo_name)).title().replace(" ", '') 
+            app_name = ' '.join(re.findall(r'\w+', repo_name)).title().replace(" ", '')
 
            # If app name not in in file name, change app name
            # Example: BraveAppImage is not in brave-stable.AppImage
            # In bellow we will assing app_name to brave-stable
-            if not re.search(app_name, app_data['name'], re.IGNORECASE):                
+            if not re.search(app_name, app_data['name'], re.IGNORECASE):
                 app_name_list = re.findall(r'[A-Za-z]+', app_data['name'])
-                app_name = app_data['name'].split(app_name_list[1])[0] + app_name_list[1] 
+                app_name = app_data['name'].split(app_name_list[1])[0] + app_name_list[1]
 
-            return app_name                
-        
+            return app_name
+
         app_name = app_name_generator(url)
 
         if not os.path.exists(self.repo_pth):
             self.create_repo()
 
-        with open(self.repo_pth, "r") as data_file:
+        with open(self.repo_pth, "r", encoding="utf-8") as data_file:
             # Reading old data
             data = json.load(data_file)
 
         data[app_name] = url
-        with open(self.repo_pth, 'w') as file:
-            json.dump(data, file, indent = 2) 
+        with open(self.repo_pth, 'w', encoding="utf-8") as file:
+            json.dump(data, file, indent = 2)
 
         return data
 
-    def get_repo(self):
+    def get_repo(self) -> dict:
+        """Returns user added repo"""
+
         if not os.path.exists(self.repo_pth):
             return {}
 
-        with open(self.repo_pth, "r") as data_file:
-            # Reading old data
+        with open(self.repo_pth, "r", encoding="utf-8") as data_file:
             data = json.load(data_file)
 
         return data
 
     def get_main_app_dir(self) -> str:
-        with open(self.cfg_pth) as file:
+        """Returns main appimage installation folder path"""
+        with open(self.cfg_pth, 'r', encoding="utf-8") as file:
             data = json.load(file)
-        
+
         return data['MainFolder']
-    
+
     def get_config(self) -> dict:
+        """If config file is exsists than returns file as dictionary."""
         if not os.path.exists(self.cfg_pth):
-            return {}        
-        
-        with open(self.cfg_pth, "r") as data_file:
+            return {}
+
+        with open(self.cfg_pth, "r", encoding="utf-8") as data_file:
             try:
                 data = json.load(data_file)
             except json.decoder.JSONDecodeError:
-                # If json is corrupted delete and create new one     
+                # If json is corrupted delete and create new one
                 os.remove(self.cfg_pth)
                 self.create_config()
-                with open(self.cfg_pth, "r") as data_file:
+                with open(self.cfg_pth, "r", encoding="utf-8") as data_file:
                     data = json.load(data_file)
 
         return data
@@ -125,61 +131,67 @@ class FileSuite:
                 # Than only focus returning .AppImage
                 # For make this always work, after-
                 #updating, old .AppImage should be deleted.
-                for file_ in os.listdir(os.path.join(directory, dir_)):                    
+                for file_ in os.listdir(os.path.join(directory, dir_)):
                     if re.search(r'.AppImage$', file_, re.IGNORECASE):
                         return os.path.join(directory, dir_, file_)
         # raise FileNotFoundError(f'App is not exist in "{directory}"')
-        return '' 
-    
-    def create_desktop(self, app_data):
+        return ''
+
+    def create_desktop(self, app_data) -> None:
         """Creates .desktop files but if they exist
         than only updates with new data."""
-        
-        app_full_path = os.path.join(app_data['app_down_path'], app_data['name']) 
+
+        app_full_path = os.path.join(app_data['app_down_path'], app_data['name'])
         # Make .AppImage file exacutable
         os.system(f'chmod +x {app_full_path}')
-        
+
         path = f'{os.path.expanduser("~")}/.local/share/applications/'
         if not os.path.exists(path):
             os.makedirs(path)
 
-        app_name = re.findall('\w+', app_data['name'])[0].lower()
+        app_name = re.findall(r'\w+', app_data['name'])[0].lower()
         desktop_path = path + app_name + '.desktop'
         app_icon_path = os.path.join(app_data['app_down_path'], "icon.png")
 
-        if not os.path.exists(app_icon_path):                        
-            with open(app_icon_path, 'wb') as file:            
-                example_dot = file.write(logo_generator(re.findall('\w+', app_data['name'])[0]))
+        if not os.path.exists(app_icon_path):
+            with open(app_icon_path, 'wb', encoding="utf-8") as file:
+                example_dot = file.write(logo_generator(re.findall(r'\w+', app_data['name'])[0]))
 
         # If .desktop is exist only change version
-        if not os.path.exists(desktop_path):                   
-            with open(f'{os.path.dirname(__file__)}/data/example.desktop', 'r') as file:            
+        if not os.path.exists(desktop_path):
+            example_path = f'{os.path.dirname(__file__)}/data/example.desktop'
+            with open(example_path, 'r', encoding="utf-8") as file:
                 example_dot = file.read()
-            
-            example_dot = example_dot.replace('{app_path}', os.path.join(app_data['app_down_path'], app_data['name']))
-            example_dot = example_dot.replace('{app_name}', re.findall('\w+', app_data['name'])[0])
+
+            example_dot = example_dot.replace(
+                '{app_path}', os.path.join(app_data['app_down_path'], app_data['name'])
+            )
+            example_dot = example_dot.replace('{app_name}', re.findall(r'\w+', app_data['name'])[0])
             example_dot = example_dot.replace('{app_icon_path}', app_icon_path)
 
-            with open(desktop_path, 'w') as file:
+            with open(desktop_path, 'w', encoding="utf-8") as file:
                 file.write(example_dot)
         else:
             # If .dekstop exist than only update app name in .desktop
-            with open(desktop_path, 'r') as file:
+            with open(desktop_path, 'r', encoding="utf-8") as file:
                 desktop_f = file.read()
             # Get the will replaced item
-            first_word = re.findall('\w+', app_data['name'])[0]            
+            first_word = re.findall(r'\w+', app_data['name'])[0]
             to_replace = re.search(f'{first_word}(.*).AppImage', desktop_f).group()
             # When sub dir name is same with app name, remove sub dir name
             if '/' in to_replace:
                 to_replace = to_replace.split('/')[-1]
             desktop_f = desktop_f.replace(to_replace, app_data['name'])
-            with open(desktop_path, 'w') as file:
-                file.write(desktop_f)         
+            with open(desktop_path, 'w', encoding="utf-8") as file:
+                file.write(desktop_f)
 
-    def remove_app_files(self, path):
-        desktop_sub_path = f'{os.path.expanduser("~")}/.local/share/applications/'  
-        
-        app_desktop_file = desktop_sub_path + re.findall('\w+', path.split('/')[-1])[0] + '.desktop'
+    def remove_app_files(self, path) -> None:
+        """Removes related files for given appimage."""
+
+        desktop_sub_path = f'{os.path.expanduser("~")}/.local/share/applications/'
+
+        app_desktop_file = desktop_sub_path
+        app_desktop_file += re.findall(r'\w+', path.split('/')[-1])[0] + '.desktop'
         path = path.replace('/' + path.split('/')[-1], '')
 
         # Bellow could be dangerous if any bugs occur!
