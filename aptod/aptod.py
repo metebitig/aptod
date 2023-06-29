@@ -27,8 +27,10 @@ def download_menu():
         menu_cursor_style=("fg_green", "bold"),
         title='Select for download:',
     )
-
-    return list(terminal_menu.chosen_menu_entries)
+    
+    terminal_menu.show()
+    menu_entry_index = terminal_menu.chosen_menu_entries
+    return list(menu_entry_index)
 
 def remove_menu():
     """Show remove menu."""
@@ -40,7 +42,9 @@ def remove_menu():
         title='Select for REMOVE:',
     )
 
-    return list(terminal_menu.chosen_menu_entries)
+    terminal_menu.show()
+    menu_entry_index = terminal_menu.chosen_menu_entries
+    return list(menu_entry_index)
 
 
 class Aptod:

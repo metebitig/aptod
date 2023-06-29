@@ -10,6 +10,7 @@ import json
 import  re
 
 from .logo_maker import logo_generator
+from .icon_finder import AppimageIconRepoFinder
 
 
 class FileSuite:
@@ -154,8 +155,11 @@ class FileSuite:
         app_icon_path = os.path.join(app_data['app_down_path'], "icon.png")
 
         if not os.path.exists(app_icon_path):
-            with open(app_icon_path, 'wb', encoding="utf-8") as file:
-                example_dot = file.write(logo_generator(re.findall(r'\w+', app_data['name'])[0]))
+            with open(app_icon_path, 'wb') as file:
+                logo = AppimageIconRepoFinder().get_icon_as_bytes(app_name)
+                if not logo:
+                    logo = logo_generator(re.findall(r'\w+', app_data['name'])[0])
+                file.write(logo)
 
         # If .desktop is exist only change version
         if not os.path.exists(desktop_path):
