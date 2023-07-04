@@ -4,19 +4,58 @@ Aptod class and cli dialogs.
 
 import os
 import re
+import time
+from collections import OrderedDict
 import argparse
 from simple_term_menu import TerminalMenu
 
-from .utils import downloader
+from .utils import downloader, is_valid_url
 from .extract_suite import ExtractSuite
 from .up_suite import UpSuite
 from .file_suite import FileSuite
-
+from .icon_repo_finder import AppimageIconRepoFinder
 
 __version__ = "0.0.1"
 
 
 APP_LIST =  ExtractSuite().get('all')
+
+def show_categories_menu():
+    """Show download menu."""
+    unofficial_apps = FileSuite().get_repo(unofficial=True)
+    categories = list(dict.fromkeys([_['categorie'] for _ in unofficial_apps]))
+    
+    categories_menu = TerminalMenu(
+        categories,
+        show_multi_select_hint=True,
+        menu_cursor_style=("fg_green", "bold"),
+        title='CATEGORIES:',
+    )
+    
+    menu_entry_index = categories_menu.show()
+    
+    categorie = categories[menu_entry_index]
+    categoried_apps = []
+    categoried_apps_clean = []
+    for app in unofficial_apps:
+        if app['categorie'] == categorie:
+            categoried_apps_clean.append(app)
+            categoried_apps.append(
+                f"{app['name']} ({app['comment']}) ({app['url']})".replace('(None)', '')
+            )
+
+    unoffical_apps_menu = TerminalMenu(
+        categoried_apps,
+        multi_select=True,
+        show_multi_select_hint=True,
+        menu_cursor_style=("fg_green", "bold"),
+        title=f'{categorie} APPS:',
+    )
+
+    chosen_indexes = unoffical_apps_menu.show()
+    chosens = [categoried_apps_clean[_] for _ in chosen_indexes]
+
+    return chosens
 
 def download_menu():
     """Show download menu."""
@@ -67,9 +106,15 @@ class Aptod:
             return
         self.file_suite.create_config()
 
-    def create_repo(self):
-        """Create appimage repo file for user added appimages."""
-        self.file_suite.create_repo()
+    def create_repo(self, unofficial=False):
+        """Create appimage repo file for user added appimages."""   
+        
+        self.file_suite.create_repo(unofficial)
+
+        # Create repo and add items inside.
+        if unofficial:
+            data = AppimageIconRepoFinder().download_repostory()
+            self.file_suite.add_unofficial_repo(data)
 
     def installed_apps(self):
         """Returns installed app names as list."""
@@ -85,7 +130,7 @@ class Aptod:
         for dir_ in os.listdir(apps_folder):
             # Requried for errors
             if not os.path.isfile(dir_):
-                for file in os.listdir(apps_folder + '/' + dir_):
+                for file in os.listdir(os.path.join(apps_folder, dir_)):
                     if file.lower().endswith('.appimage'):
                         installed_appimages[file] = apps_folder + '/' + dir_ + '/' + file
                         break
@@ -122,7 +167,7 @@ class Aptod:
             app_data = self.update_suite.has_update(app_path)
             # If functions returns data, there is a update
             if app_data.get('Error'):
-                print(app_data['Error'])
+                print(f"{app_data['Error']}", end='\r')
             elif app_data:
                 print(f'❌ {app} is old to date.')
                 if kwargs.get('operation') == 'update':
@@ -133,27 +178,29 @@ class Aptod:
             else:
                 print(f'✅ {app} is up to date.')
 
-    def install_app(self, app_list):
+    def install_app(self, app_name: list = [], app_data: dict = {}) -> None:
         """Installas apps, creates logos, desktop files for them."""
-        if 'all' in app_list:
-            app_list = ExtractSuite().get('all')
-        for app in app_list:
-            app_data = ExtractSuite().get(app)
+
+        def installer(app_data):
             if isinstance(app_data, dict) and app_data.get('Error'):
                 print(app_data['Error'])
-            elif app_data:
-                # Create folder with app name
-                # Make first letter capital
-                app = ''.join(re.findall(r'\w+', app_data['name'])[:2])
-                down_path = self.main_folder + '/' + app
-                if not os.path.exists(down_path):
-                    os.makedirs(down_path)
-                app_data['app_down_path'] = down_path
-                downloader(app_data)
-                # Create .desktop for integration
-                self.file_suite.create_desktop(app_data)
-            else:
-                print(app_data)
+                return
+
+            # Create folder with app name
+            # Make first letter capital
+            app = ''.join(re.findall(r'\w+', app_data['name'])[:2])
+            down_path = os.path.join(self.main_folder, app)
+            if not os.path.exists(down_path):
+                os.makedirs(down_path)
+            app_data['app_down_path'] = down_path
+            downloader(app_data)
+            # Create .desktop for integration
+            self.file_suite.create_desktop(app_data)
+
+        if not app_data:
+            app_data = ExtractSuite().get(app_name)
+        
+        installer(app_data)
 
 
 
@@ -198,7 +245,7 @@ def app_data_error_handler(app_data: dict, func) -> None:
     else:
         func(app_data)
 
-# Entry point to cli
+
 def main():
     """Entry point of cli app."""
 
@@ -217,14 +264,10 @@ def main():
                 return path
             raise argparse.ArgumentTypeError(f"readable_file:{path} is not exist")
 
-        def is_valid_url(url):
-            """Validate github and gitlab urls."""
-            github_pattern = r'(https?:\/\/)*(www\.)*github\.com\/[a-zA-Z_0-9-]+\/[a-zA-Z_0-9-]+'
-            # gitlab_pattern = r'(https?:\/\/)*(www\.)*gitlab\.com\/[a-zA-Z_]+'
-
-            for pattern in [github_pattern]:
-                if re.search(pattern, url):
-                    return url
+        def is_valid_url_raise(url):
+            """Raised version of is_valid_url"""
+            if is_valid_url(url):
+                return url
             raise argparse.ArgumentTypeError(f"url:{url} is not valid.")
 
         def is_installed(app_name):
@@ -237,7 +280,7 @@ def main():
 
         parser = argparse.ArgumentParser(
             prog="Aptod",
-            description="Install and update AppImage's",
+            description="Install and update AppImages",
             formatter_class=lambda prog: argparse.HelpFormatter(prog, max_help_position=27))
         parser.add_argument('-V', '--version', action='version', version=f"Aptod ({__version__})")
 
@@ -245,12 +288,12 @@ def main():
         group.add_argument(
             '--install', '-i',
             metavar='AppImage',
-            help='Installs given AppImage\'s.',
+            help='Installs given AppImages.',
             nargs='*')
         group.add_argument(
             '--download', '-d',
             metavar='AppImage',
-            help='Downloads given AppImage\'s.',
+            help='Downloads given AppImages.',
             nargs='*')
         group.add_argument(
             '--update', '-u',
@@ -268,13 +311,17 @@ def main():
         group.add_argument(
             '--add-repo', '-ar',
             help='Add new url repo.',
-            type=is_valid_url)
+            type=is_valid_url_raise)
         group.add_argument(
             '--remove', '-rm',
             metavar='AppImage',
             nargs='*',
             help='Remove the installed app.',
             type=is_installed)
+        group.add_argument(
+            '--activate-unofficial', '-au',
+            help='Add apps to local repo from appimage.github.io.',
+            action='store_true')        
 
         parser.add_argument(
             '--path', "-P",
@@ -286,6 +333,12 @@ def main():
             metavar='File',
             help='AppImage file full path\'s for the update.',
             type=is_file)
+        parser.add_argument(
+            '--show-unofficial', '-su',
+            help='Show apps from unofficial repos.',
+            action='store_true')
+        
+
 
         args = parser.parse_args()
 
@@ -294,14 +347,27 @@ def main():
                 app_data = ExtractSuite().get(args.add_repo)
                 app_data_error_handler(app_data, Aptod().file_suite.update_repo)
 
+        if args.show_unofficial:
+            select_menu = show_categories_menu
+        else:
+            select_menu = download_menu
 
+        ## Read for -> isintance(args.foo, foo)
+        # If args.foo is list, it means --foo entered by user
+        # Otherwise it becomes None.
 
         # Install --install, -i
         if isinstance(args.install, list):
-            if len(args.install) > 0:
-                Aptod().install_app(args.install)
-            else:
-                Aptod().install_app(download_menu())
+            app_list = args.install
+            if not app_list:
+                app_list = select_menu()
+            
+            for app in app_list:
+                # If its dict than its from show_categories_menu
+                if isinstance(app, dict):
+                    app = app['url']
+                Aptod().install_app(app)
+                
         # List --installed-apps, -ia
         elif args.installed_apps:
             print('MY APPS:')
@@ -311,30 +377,22 @@ def main():
 
         # Download --download, -d
         elif isinstance(args.download, list):
-            if args.path:
-                if len(args.download) > 0:
-                    for app in args.download:
-                        app_data = ExtractSuite().get(app)
-                        app_data['app_down_path'] = args.path
-                        app_data_error_handler(app_data, downloader)
 
-                else:
-                    for app in download_menu():
-                        app_data = ExtractSuite().get(app)
-                        app_data['app_down_path'] = args.path
-                        app_data_error_handler(app_data, downloader)
-            else:
-                if len(args.download) > 0:
-                    for app in args.download:
-                        app_data = ExtractSuite().get(app)
-                        app_data['app_down_path'] = os.getcwd()
-                        app_data_error_handler(app_data, downloader)
-                else:
-                    for app in download_menu():
-                        app_data = ExtractSuite().get(app)
-                        app_data['app_down_path'] = os.getcwd()
-                        app_data_error_handler(app_data, downloader)
+            down_path = args.path
+            if not down_path:
+                down_path = os.getcwd()
+            
+            app_list = args.download
+            if not app_list: 
+                app_list = select_menu()
 
+            for app in app_list:
+                # If its dict than its from show_categories_menu
+                if isinstance(app, dict):
+                    app = app['url']
+                app_data = ExtractSuite().get(app)
+                app_data['app_down_path'] = down_path
+                app_data_error_handler(app_data, downloader)
 
         # --update, -u
         elif isinstance(args.update, list):
@@ -348,10 +406,11 @@ def main():
 
         # --avaliable-apps, -aa
         elif args.available_apps:
-            print('AVAILABLE APPIMAGE\'S:')
+            print('AVAILABLE APPIMAGES:')
             for app in APP_LIST:
                 print(f'{APP_LIST.index(app) + 1}){app}')
 
+        # --remove -rm
         elif isinstance(args.remove, list):
             if len(args.remove) > 0:
                 Aptod().uninstall_app(args.remove)
@@ -359,6 +418,13 @@ def main():
                 Aptod().uninstall_app(remove_menu())
             else:
                 print('Curretly you don\'t have any installed app.')
+
+        # --activate-unofficial -au
+        elif args.activate_unofficial:
+            Aptod().create_repo(unofficial=True)
+
+        else:
+            parser.print_help()
 
     except KeyboardInterrupt:
         print('Keyboard interrupt, exiting.')

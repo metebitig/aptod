@@ -2,10 +2,20 @@
 Utils for Aptod.
 """
 import os
+import re
 import requests
 from clint.textui import progress
 
+def is_valid_url(url: str):
+    """Checks url is valid Github or Gitlab url.
+    If url is valid than returns url other wise returns False."""
+    github_pattern = r'(https?:\/\/)*(www\.)*github\.com\/[a-zA-Z_0-9-]+\/[a-zA-Z_0-9-]+'
+    gitlab_pattern = r'(https?:\/\/)*(www\.)*gitlab\.com\/[a-zA-Z_]+'
 
+    for pattern in [gitlab_pattern, github_pattern]:
+        if re.search(pattern, url):
+            return url
+    return False
 
 
 def downloader(app_data: dict, timeout=5):

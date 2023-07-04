@@ -10,16 +10,17 @@ import json
 import  re
 
 from .logo_maker import logo_generator
-from .icon_finder import AppimageIconRepoFinder
+from .icon_repo_finder import AppimageIconRepoFinder
 
 
 class FileSuite:
     """Creates, updates, deletes neccesary files for Aptod."""
-
+    
     def __init__(self):
-        self.cfg_dir = os.path.expanduser('~') + "/.config/aptod"
-        self.cfg_pth = self.cfg_dir + '/aptod.conf'
-        self.repo_pth = self.cfg_dir + '/aptod_repo.json'
+        self.cfg_dir = os.path.join(os.path.expanduser('~'), ".config/aptod" )
+        self.cfg_pth = os.path.join(self.cfg_dir, 'aptod.conf')
+        self.repo_pth = os.path.join(self.cfg_dir, 'aptod_repo.json')
+        self.unofficial_repo_pth = os.path.join(self.cfg_dir, 'unofficial_repo.json')
 
     def create_config(self) -> None:
         """Creates config file for user."""
@@ -42,37 +43,48 @@ class FileSuite:
         if not os.path.exists(cfg_data['MainFolder']):
             os.makedirs(cfg_data['MainFolder'])
 
-    def create_repo(self) -> None:
-        """Creates repo file for Aptod, if thats already exist."""
-        if os.path.exists(self.repo_pth):
+    def create_repo(self, default=True) -> None:
+        """Creates repo file for Aptod."""
+        
+        if default:
+            repo_path = self.repo_pth
+        else:
+            repo_path = self.unofficial_repo_pth
+
+        if os.path.exists(repo_path):
             return
 
-        with open(self.repo_pth, 'w', encoding="utf-8") as file:
+        with open(repo_path, 'w', encoding="utf-8") as file:
             json.dump({}, file, indent=2)
 
+    def add_unofficial_repo(self, repo_list: list):
+        """Initilization purposes"""
+        with open(self.unofficial_repo_pth, 'w', encoding="utf-8") as file:
+            json.dump(repo_list, file, indent=2)
+
     def update_repo(self, app_data: dict) -> dict:
-        """Adds new url to local repo file."""
-        url = app_data['down_url']
-
+        """Adds new url to local repo file."""        
+        
         def app_name_generator(url: str) -> str:
-
             list_of_url = url.split('.com/', 1)[1]
             repo_name = list_of_url.split('/')[1]
 
             # Capitalize each capital letter, than remove spaces in name
             app_name = ' '.join(re.findall(r'\w+', repo_name)).title().replace(" ", '')
 
-           # If app name not in in file name, change app name
-           # Example: BraveAppImage is not in brave-stable.AppImage
-           # In bellow we will assing app_name to brave-stable
-            if not re.search(app_name, app_data['name'], re.IGNORECASE):
-                app_name_list = re.findall(r'[A-Za-z]+', app_data['name'])
-                app_name = app_data['name'].split(app_name_list[1])[0] + app_name_list[1]
+            # If app name not in in file name, change app name
+            # Example: BraveAppImage is not in brave-stable.AppImage
+            # In bellow we will assing app_name to brave-stable
 
+            # Remove .appimage extension in name            
+            clear_name = re.sub('.appimage', '', app_data['name'], flags=re.IGNORECASE)
+            if not re.search(app_name, clear_name, re.IGNORECASE):
+                app_name = re.findall(r'[A-Za-z]+', clear_name)[0]
             return app_name
 
+        url = app_data['down_url']
         app_name = app_name_generator(url)
-
+        
         if not os.path.exists(self.repo_pth):
             self.create_repo()
 
@@ -86,13 +98,17 @@ class FileSuite:
 
         return data
 
-    def get_repo(self) -> dict:
+    def get_repo(self, unofficial=False) -> dict:
         """Returns user added repo"""
 
-        if not os.path.exists(self.repo_pth):
+        repo_path = self.repo_pth
+        if unofficial:
+            repo_path = self.unofficial_repo_pth
+
+        if not os.path.exists(repo_path):
             return {}
 
-        with open(self.repo_pth, "r", encoding="utf-8") as data_file:
+        with open(repo_path, "r", encoding="utf-8") as data_file:
             data = json.load(data_file)
 
         return data
@@ -195,7 +211,7 @@ class FileSuite:
         desktop_sub_path = f'{os.path.expanduser("~")}/.local/share/applications/'
 
         app_desktop_file = desktop_sub_path
-        app_desktop_file += re.findall(r'\w+', path.split('/')[-1])[0] + '.desktop'
+        app_desktop_file += re.findall(r'\w+', path.split('/')[-1])[0].lower() + '.desktop'
         path = path.replace('/' + path.split('/')[-1], '')
 
         # Bellow could be dangerous if any bugs occur!

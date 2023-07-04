@@ -5,6 +5,8 @@ Most important module for Aptod.
 import re
 import platform
 import time
+import os
+import json
 from urllib.parse import urlparse, unquote
 from pathlib import PurePosixPath
 import requests
@@ -12,6 +14,8 @@ from cpuinfo import get_cpu_info
 
 
 from .file_suite import FileSuite
+from .data.default_apps import default_apps
+from .utils import is_valid_url
 
 
 class ExtractSuite:
@@ -27,20 +31,26 @@ class ExtractSuite:
             ['i386', 'ia32', 'i486', 'i686', 'x86']
         ]
 
-    def compatible_with_my_proccessor(self, file_name):
+    def _compatible_with_my_proccessor(self, file_name: str) -> bool:
         """If given file_name includes any processor
-        architecture, then choose one that's compatible
-        with user proscessor"""
-
+        architecture, then check is compatible
+        with users proscessor."""
+        
+        # Find host machine proc arch
         my_proc = platform.machine()
+        # Above do not works on some machines but way faster
         if not my_proc:
             my_proc = get_cpu_info()['arch']
-        proc_comparation_list = []
-        for proc in self.processor_arch_list:
-            if isinstance(proc, list) and not my_proc.lower() in proc:
-                proc_comparation_list = [*proc_comparation_list, *proc]
 
-        for proc in proc_comparation_list:
+        incompatible_arch_list: list = []
+        # proc is list
+        for proc in self.processor_arch_list:
+            # Add arch to incompatible_arch_list if its not compatible with host machine
+            if my_proc.lower() not in proc:
+                incompatible_arch_list = [*incompatible_arch_list, *proc]
+        
+        # If file_name includes any incompatible arch type inside its name return false
+        for proc in incompatible_arch_list:
             for re_item in re.findall(r'\w+', file_name, re.IGNORECASE):
                 # Special treament for x86 and x86_64 confuse
                 if proc == 'x86':
@@ -51,7 +61,7 @@ class ExtractSuite:
 
         return True
 
-    def nail_version(self, down_url: str) -> str:
+    def _nail_version(self, down_url: str) -> str:
         """Takes downloading url as argument,
         and returns url's last part as a name.
         If last part of url doesn't have an version as a
@@ -59,6 +69,7 @@ class ExtractSuite:
         Version in name requried for checking updates."""
 
         name = down_url.split('/')[-1]
+        print(down_url, name)
         nums = re.findall('[0-9]+', down_url.split('/')[-2])
         has_version = False
 
@@ -80,19 +91,17 @@ class ExtractSuite:
 
         return name
 
-    def github_extractor(self, owner=None, repo=None, **kwargs) -> dict:
-        """Takes Github repo and it's owner as
-        arugment. Returns latest appImage data.
-        If couldn't find data returns empty dictionary."""
-
-        kwargs_url = kwargs.get('url')
-        if kwargs_url:
-            owner = PurePosixPath(unquote(urlparse(kwargs_url).path)).parts[1]
-            repo = PurePosixPath(unquote(urlparse(kwargs_url).path)).parts[2]
+    def github_extractor(self, owner=None, repo=None, url=None) -> dict:
+        """Takes Github repo and it's owner as arugment or instead 
+        directly url for repo. Returns latest release data for appImage."""
+        
+        if url:
+            owner = PurePosixPath(unquote(urlparse(url).path)).parts[1]
+            repo = PurePosixPath(unquote(urlparse(url).path)).parts[2]
 
         api_url = f'https://api.github.com/repos/{owner}/{repo}/releases'
 
-        def get_releases(url: str, page: int=1, per_page: int=30) -> list:
+        def get_releases(url: str, page: int = 1, per_page: int = 30) -> list:
             headers = {
                 'X-GitHub-Api-Version': '2022-11-28',
                 "Accept": "application/vnd.github+json"
@@ -100,7 +109,6 @@ class ExtractSuite:
             params = {'per_page': per_page, 'page': page}
             res = requests.get(url, headers=headers, params=params, timeout=5)
             res_json = res.json()
-
 
             # Let user know, if rate limit ended.
             if res.status_code == 403 and res.headers['X-RateLimit-Remaining'] == '0':
@@ -111,7 +119,7 @@ class ExtractSuite:
                 )
                 return [{
                     'Error': f"Your hourly Github api rate limit (60) exceeded."
-                    f"\nLimit will be reset after {remaining_time} minutes."
+                    f"Limit will be reset after {remaining_time} minutes."
                 }]
             if res.status_code == 404:
                 return [{
@@ -132,8 +140,8 @@ class ExtractSuite:
                 for asset in rel.get('assets'):
                     # 1) Bellow, If asset matchs with regex, than thats a appimage
                     # 2) If AppImage inlcudes processor arc type than choose compatible one.
-                    if (re.search('.AppImage$', asset['name']) and
-                        self.compatible_with_my_proccessor(asset['name'])):
+                    if (re.search('.AppImage$', asset['name'], re.IGNORECASE) and
+                        self._compatible_with_my_proccessor(asset['name'])):
                         return {
                             'down_url': asset['browser_download_url']
                         }
@@ -165,7 +173,8 @@ class ExtractSuite:
             return {'Error': f'No release has been found for appImage at {repo}.'}
 
         # Get name for data, from down_url
-        data['name'] = self.nail_version(data['down_url'])
+        data['name'] = self._nail_version(data['down_url'])
+        if url: FileSuite().update_repo(data)
         return  data
 
     def gitlab_extractor(self, project_id) -> dict:
@@ -197,7 +206,7 @@ class ExtractSuite:
                 # If asset match with re, than that's what we need
                 # If there is i386 (32-bit) or aarch keep search for 64-bit
                     if (re.search('.AppImage$', url['name']) and
-                        self.compatible_with_my_proccessor(url['name'])):
+                        self._compatible_with_my_proccessor(url['name'])):
                         return {
                             'down_url': url['url']
                         }
@@ -207,82 +216,46 @@ class ExtractSuite:
         releases = get_releases(api_url)
         data = app_data(releases)
         # Get name for data, from down_url
-        data['name'] = self.nail_version(data['down_url'])
+        data['name'] = self._nail_version(data['down_url'])
         return  data
 
-    def is_valid_url(self, url: str):
-        """Checks url is valid Github or Gitlab url.
-            If url is valid than returns url other wise returns False."""
-        github_pattern = r'(https?:\/\/)*(www\.)*github\.com\/[a-zA-Z_0-9-]+\/[a-zA-Z_0-9-]+'
-        gitlab_pattern = r'(https?:\/\/)*(www\.)*gitlab\.com\/[a-zA-Z_]+'
+    
 
-        for pattern in [gitlab_pattern, github_pattern]:
-            if re.search(pattern, url):
-                return url
-        return False
-
-
-    def get(self, app):
+    def get(self, app: str):
         """
         Returns app data or available app list
         """
 
-        apps = {
-            'tutanota': lambda: self.github_extractor('tutao', 'tutanota'),
-            'vscodium': lambda: self.github_extractor('VSCodium', 'vscodium'),
-            'bitwarden': lambda: self.github_extractor('bitwarden', 'bitwarden'),
-            'insomnia': lambda: self.github_extractor('Kong', 'insomnia'),
-            'keepassxc': lambda: self.github_extractor('keepassxreboot', 'keepassxc'),
-            'session': lambda: self.github_extractor('oxen-io', 'session-desktop'),
-            'shotcut': lambda: self.github_extractor('mltframework', 'shotcut'),
-            'audacity': lambda: self.github_extractor('audacity', 'audacity'),
-            'freecad': lambda: self.github_extractor('FreeCAD', 'FreeCAD'),
-            'subsurface': lambda: self.github_extractor('subsurface', 'subsurface'),
-            'etcher': lambda: self.github_extractor('balena-io', 'etcher'),
-            'exifcleaner': lambda: self.github_extractor('szTheory', 'exifcleaner'),
-            'hyper': lambda: self.github_extractor('vercel', 'hyper'),
-            'electronmail': lambda: self.github_extractor('vladimiry', 'ElectronMail'),
-            'musescore': lambda: self.github_extractor('musescore', 'MuseScore'),
-            'picocrypt': lambda: self.github_extractor('HACKERALERT', 'Picocrypt'),
-            'cryptomator': lambda: self.github_extractor('cryptomator', 'cryptomator'),
-            'openvideodownloader': lambda: self.github_extractor('jely2002', 'youtube-dl-gui'),
-            'astroffers': lambda: self.github_extractor('hasyee', 'astroffers'),
-            'cliniface': lambda: self.github_extractor('frontiersi', 'Cliniface'),
-            'appimagelauncher': lambda: self.github_extractor('TheAssassin', 'AppImageLauncher'),
-            'aranym': lambda: self.github_extractor('aranym', 'aranym'),
-            'appimageupdate': lambda: self.github_extractor('AppImageCommunity', 'AppImageUpdate'),
-            'youtube-music': lambda: self.github_extractor('th-ch', 'youtube-music'),
-            'appimagepool': lambda: self.github_extractor('prateekmedia', 'appimagepool'),
-            'aphototool': lambda: self.github_extractor('aphototool', 'A-Photo-Tool-Libre'),
-            'alduin': lambda: self.github_extractor('AlduinApp', 'alduin'),
-            'anotherredisdesktopmanager': lambda: self.github_extractor(
-                'qishibo', 'AnotherRedisDesktopManager'
-            ),
-            'appoutlet': lambda: self.github_extractor('appoutlet', 'appoutlet'),
-            'arcade-manager': lambda: self.github_extractor('cosmo0', 'arcade-manager'),
-            'arduino-ide': lambda: self.github_extractor('arduino', 'arduino-ide'),
-            'artisan': lambda: self.github_extractor('artisan-roaster-scope', 'artisan'),
-            'auryo': lambda: self.github_extractor('sneljo1', 'auryo'),
-            'librewolf': lambda: self.gitlab_extractor(24386000),
-            'gameimage': lambda: self.gitlab_extractor(39866323)
-        }
-
+        apps: dict = {}
+    
+        # Data imported from aptod.data
+        for app_ in default_apps:
+            if app_['type'] == 'github':
+                parsed_path = app_['path'].split('/')
+                apps.update(
+                    {app_['name']: lambda: self.github_extractor(parsed_path[0], parsed_path[1])}
+                )
+            else:
+                apps.update(
+                    {app_['name']: lambda: self.gitlab_extractor(app_['projectId'])}
+                )
+                
+        
         # Return list of avaliable apps
-        build_in_apps = apps.keys()
+        build_in_apps = [_['name'] for _ in default_apps]
         repo_apps = FileSuite().get_repo()
-        avaliable_apps = [*build_in_apps, *repo_apps.keys()]
 
-        if app == 'all':
-            return avaliable_apps
+        if app == 'all':            
+            return [*build_in_apps, *repo_apps.keys()]
 
         # If app is url...
-        if self.is_valid_url(app):
+        if isinstance(app, str) and is_valid_url(app):
             if 'github' in app:
                 return self.github_extractor(url=app)
 
         if app in build_in_apps:
             return apps[app.lower()]()
-
+      
         if app in repo_apps:
             return self.github_extractor(url=repo_apps[app])
 
