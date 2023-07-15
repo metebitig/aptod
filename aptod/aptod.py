@@ -199,6 +199,7 @@ class Aptod:
 
         if not app_data:
             app_data = ExtractSuite().get(app_name)
+            print(app_data)
         
         installer(app_data)
 

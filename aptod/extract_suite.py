@@ -94,13 +94,15 @@ class ExtractSuite:
     def github_extractor(self, owner=None, repo=None, url=None) -> dict:
         """Takes Github repo and it's owner as arugment or instead 
         directly url for repo. Returns latest release data for appImage."""
-        
+
+   
         if url:
             owner = PurePosixPath(unquote(urlparse(url).path)).parts[1]
             repo = PurePosixPath(unquote(urlparse(url).path)).parts[2]
 
         api_url = f'https://api.github.com/repos/{owner}/{repo}/releases'
 
+    
         def get_releases(url: str, page: int = 1, per_page: int = 30) -> list:
             headers = {
                 'X-GitHub-Api-Version': '2022-11-28',
@@ -225,38 +227,41 @@ class ExtractSuite:
         """
         Returns app data or available app list
         """
-
+     
         apps: dict = {}
     
         # Data imported from aptod.data
         for app_ in default_apps:
             if app_['type'] == 'github':
                 parsed_path = app_['path'].split('/')
+                
+                owner, repo = parsed_path[0], parsed_path[1]
                 apps.update(
-                    {app_['name']: lambda: self.github_extractor(parsed_path[0], parsed_path[1])}
+                    {app_['name']: lambda owner=owner, repo=repo: self.github_extractor(owner, repo)}
                 )
             else:
                 apps.update(
-                    {app_['name']: lambda: self.gitlab_extractor(app_['projectId'])}
+                    {app_['name']: lambda project_id=app_['projectId']: self.gitlab_extractor(project_id)}
                 )
-                
+
         
         # Return list of avaliable apps
         build_in_apps = [_['name'] for _ in default_apps]
         repo_apps = FileSuite().get_repo()
-
+        
         if app == 'all':            
             return [*build_in_apps, *repo_apps.keys()]
-
+        
         # If app is url...
         if isinstance(app, str) and is_valid_url(app):
             if 'github' in app:
                 return self.github_extractor(url=app)
-
+        
         if app in build_in_apps:
             return apps[app.lower()]()
-      
+        
         if app in repo_apps:
+            
             return self.github_extractor(url=repo_apps[app])
 
         return None
