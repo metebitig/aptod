@@ -69,7 +69,6 @@ class ExtractSuite:
         Version in name requried for checking updates."""
 
         name = down_url.split('/')[-1]
-        print(down_url, name)
         nums = re.findall('[0-9]+', down_url.split('/')[-2])
         has_version = False
 
@@ -237,12 +236,10 @@ class ExtractSuite:
                 
                 owner, repo = parsed_path[0], parsed_path[1]
                 apps.update(
-                    {app_['name']: lambda owner=owner, repo=repo: self.github_extractor(owner, repo)}
-                )
+                    {app_['name']: lambda owner=owner, repo=repo: self.github_extractor(owner, repo)})
             else:
                 apps.update(
-                    {app_['name']: lambda project_id=app_['projectId']: self.gitlab_extractor(project_id)}
-                )
+                    {app_['name']: lambda project_id=app_['projectId']: self.gitlab_extractor(project_id)})
 
         
         # Return list of avaliable apps

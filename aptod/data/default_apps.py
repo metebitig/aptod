@@ -21,6 +21,11 @@ default_apps = (
     },
     {
       "type": "github",
+      "name": "pulsar",
+      "path": "pulsar-edit/pulsar"
+    },
+    {
+      "type": "github",
       "name": "keepassxc",
       "path": "keepassxreboot/keepassxc"
     },

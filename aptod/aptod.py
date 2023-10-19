@@ -29,28 +29,26 @@ def show_categories_menu():
         categories,
         show_multi_select_hint=True,
         menu_cursor_style=("fg_green", "bold"),
-        title='CATEGORIES:',
-    )
+        title='CATEGORIES:')
     
     menu_entry_index = categories_menu.show()
     
     categorie = categories[menu_entry_index]
     categoried_apps = []
     categoried_apps_clean = []
+
     for app in unofficial_apps:
         if app['categorie'] == categorie:
             categoried_apps_clean.append(app)
             categoried_apps.append(
-                f"{app['name']} ({app['comment']}) ({app['url']})".replace('(None)', '')
-            )
+                f"{app['name']} ({app['comment']}) ({app['url']})".replace('(None)', ''))
 
     unoffical_apps_menu = TerminalMenu(
         categoried_apps,
         multi_select=True,
         show_multi_select_hint=True,
         menu_cursor_style=("fg_green", "bold"),
-        title=f'{categorie} APPS:',
-    )
+        title=f'{categorie} APPS:')
 
     chosen_indexes = unoffical_apps_menu.show()
     chosens = [categoried_apps_clean[_] for _ in chosen_indexes]
@@ -64,8 +62,7 @@ def download_menu():
         multi_select=True,
         show_multi_select_hint=True,
         menu_cursor_style=("fg_green", "bold"),
-        title='Select for download:',
-    )
+        title='Select for download:')
     
     terminal_menu.show()
     menu_entry_index = terminal_menu.chosen_menu_entries
@@ -78,8 +75,7 @@ def remove_menu():
         multi_select=True,
         show_multi_select_hint=True,
         menu_cursor_style=("fg_green", "bold"),
-        title='Select for REMOVE:',
-    )
+        title='Select for REMOVE:')
 
     terminal_menu.show()
     menu_entry_index = terminal_menu.chosen_menu_entries
@@ -102,8 +98,8 @@ class Aptod:
         """Create config file, exist config file means Aptod is installed."""
         # If config file exists, app is intalled.
         if self.file_suite.get_config():
-            print('Aptod is already installed.')
-            return
+            return print('Aptod is already installed.')
+            
         self.file_suite.create_config()
 
     def create_repo(self, unofficial=False):
@@ -199,7 +195,6 @@ class Aptod:
 
         if not app_data:
             app_data = ExtractSuite().get(app_name)
-            print(app_data)
         
         installer(app_data)
 

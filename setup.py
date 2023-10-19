@@ -23,4 +23,4 @@ setup(
     description="Python command line application Aptod.",
     long_description=LONG_DESC,
     author="Mete",
-    author_email="meteden@proton.me",)
+    author_email="metebtg@protonmail.com",)
