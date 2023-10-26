@@ -13,7 +13,6 @@ from .utils import downloader, is_valid_url
 from .extract_suite import ExtractSuite
 from .up_suite import UpSuite
 from .file_suite import FileSuite
-from .icon_repo_finder import AppimageIconRepoFinder
 
 __version__ = "0.0.1"
 
@@ -102,15 +101,6 @@ class Aptod:
             
         self.file_suite.create_config()
 
-    def create_repo(self, unofficial=False):
-        """Create appimage repo file for user added appimages."""   
-        
-        self.file_suite.create_repo(unofficial)
-
-        # Create repo and add items inside.
-        if unofficial:
-            data = AppimageIconRepoFinder().download_repostory()
-            self.file_suite.add_unofficial_repo(data)
 
     def installed_apps(self):
         """Returns installed app names as list."""
@@ -313,11 +303,7 @@ def main():
             metavar='AppImage',
             nargs='*',
             help='Remove the installed app.',
-            type=is_installed)
-        group.add_argument(
-            '--activate-unofficial', '-au',
-            help='Add apps to local repo from appimage.github.io.',
-            action='store_true')        
+            type=is_installed)       
 
         parser.add_argument(
             '--path', "-P",
@@ -332,9 +318,7 @@ def main():
         parser.add_argument(
             '--show-unofficial', '-su',
             help='Show apps from unofficial repos.',
-            action='store_true')
-        
-
+            action='store_true')     
 
         args = parser.parse_args()
 
@@ -414,11 +398,7 @@ def main():
                 Aptod().uninstall_app(remove_menu())
             else:
                 print('Curretly you don\'t have any installed app.')
-
-        # --activate-unofficial -au
-        elif args.activate_unofficial:
-            Aptod().create_repo(unofficial=True)
-
+     
         else:
             parser.print_help()
 

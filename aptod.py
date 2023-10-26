@@ -2,7 +2,7 @@
 Run aptod without install.
 """
 
-from aptod.aptod import main
+from src.aptod.__main__ import main
 
 
 if __name__ == '__main__':

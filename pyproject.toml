@@ -1,0 +1,43 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "aptod"
+version = "0.0.1"
+authors = [
+  { name="metebtg", email="metebtg@protonmail.com" },
+]
+description = "CLI-TOOL For Downloading or Updating AppImages"
+readme = "README.md"
+requires-python = ">=3.7"
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "License :: OSI Approved :: MIT License",
+  "Operating System :: OS Independent",
+]
+
+dependencies = [
+  'args>=0.1.0',
+  'beautifulsoup4>=4.12.2',
+  'certifi>=2023.7.22',
+  'charset-normalizer>=3.3.0',
+  'clint>=0.5.1',
+  'idna>=3.4',
+  'Pillow>=10.1.0',
+  'py-cpuinfo>=9.0.0',
+  'PyYAML>=6.0.1',
+  'requests>=2.31.0',
+  'simple-term-menu>=1.6.1',
+  'soupsieve>=2.5',
+  'urllib3>=2.0.7',
+  'matplotlib>=3.8.0'
+
+]
+
+[project.scripts]
+aptod = "aptod.__main__:main"
+
+[project.urls]
+"Homepage" = "https://github.com/metebtg/aptod"
+"Bug Tracker" = "https://github.com/metebtg/aptod/issues"

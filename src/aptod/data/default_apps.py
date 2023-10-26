@@ -170,15 +170,13 @@ default_apps = (
       "path": "sneljo1/auryo"
     },
     {
-        "type": "gitlab",
-        "name": "librewolf",
-        "projectId": 24386000
-
+      "type": "gitlab",
+      "name": "librewolf",
+      "projectId": 24386000
     },
     {
-        "type": "gitlab",
-        "name": "gameimage",
-        "projectId": 39866323
-
+      "type": "gitlab",
+      "name": "gameimage",
+      "projectId": 39866323
     },
 )

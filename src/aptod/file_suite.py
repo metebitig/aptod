@@ -9,8 +9,7 @@ import os
 import json
 import  re
 
-from .logo_maker import logo_generator
-from .icon_repo_finder import AppimageIconRepoFinder
+from .utils import IconHandler
 
 
 class FileSuite:
@@ -158,6 +157,14 @@ class FileSuite:
         """Creates .desktop files but if they exist
         than only updates with new data."""
 
+        example_dot = """[Desktop Entry]
+            Encoding=UTF-8
+            Type=Application
+            Terminal=false
+            Exec={app_path}
+            Name={app_name}
+            Icon={app_icon_path}"""   
+
         app_full_path = os.path.join(app_data['app_down_path'], app_data['name'])
         # Make .AppImage file exacutable
         os.system(f'chmod +x {app_full_path}')
@@ -167,25 +174,17 @@ class FileSuite:
             os.makedirs(path)
 
         app_name = re.findall(r'\w+', app_data['name'])[0].lower()
-        desktop_path = path + app_name + '.desktop'
+        desktop_path = f'{path}{app_name}.desktop'
         app_icon_path = os.path.join(app_data['app_down_path'], "icon.png")
 
         if not os.path.exists(app_icon_path):
-            with open(app_icon_path, 'wb') as file:
-                logo = AppimageIconRepoFinder().get_icon_as_bytes(app_name)
-                if not logo:
-                    logo = logo_generator(re.findall(r'\w+', app_data['name'])[0])
-                file.write(logo)
+            with open(app_icon_path, 'wb') as file:      
+                file.write(IconHandler().get_icon(app_name))
 
         # If .desktop is exist only change version
-        if not os.path.exists(desktop_path):
-            example_path = f'{os.path.dirname(__file__)}/data/example.desktop'
-            with open(example_path, 'r', encoding="utf-8") as file:
-                example_dot = file.read()
-
+        if not os.path.exists(desktop_path): 
             example_dot = example_dot.replace(
-                '{app_path}', os.path.join(app_data['app_down_path'], app_data['name'])
-            )
+                '{app_path}', os.path.join(app_data['app_down_path'], app_data['name']))
             example_dot = example_dot.replace('{app_name}', re.findall(r'\w+', app_data['name'])[0])
             example_dot = example_dot.replace('{app_icon_path}', app_icon_path)
 
